@@ -64,10 +64,13 @@ textarea{min-height:170px;resize:vertical}
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:70;align-items:center;justify-content:center;padding:16px}
 .modal.on{display:flex}.modal .card{background:var(--navy);max-width:480px;width:100%;max-height:85vh;overflow:auto}
 .ach{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.1)}
+.small{padding:4px 14px;font-size:.95rem}
+.dot{display:inline-block;width:14px;height:14px;border-radius:50%;margin:0 2px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.grid3 .card{margin:0;padding:12px;text-align:center}.grid3 b{display:block;font-size:1.4rem}.grid3 span{font-size:.8rem;opacity:.8}
 </style>
 </head>
 <body>
-<div class="fixed-btns"><button id="muteBtn" title="كتم الصوت" aria-label="كتم الصوت">🔊</button><button id="achBtn" title="الإنجازات" aria-label="الإنجازات">🏆</button><button id="resetBtn" title="إعادة التشغيل" aria-label="إعادة التشغيل">🔄</button></div>
+<div class="fixed-btns"><button id="muteBtn" title="كتم الصوت" aria-label="كتم الصوت">🔊</button><button id="dashBtn" title="لوحة التقدم" aria-label="لوحة التقدم">📊</button><button id="achBtn" title="الإنجازات" aria-label="الإنجازات">🏆</button><button id="resetBtn" title="إعادة التشغيل" aria-label="إعادة التشغيل">🔄</button></div>
 
 <section id="s-login" class="screen on center">
   <div class="shield">🛡️</div>
@@ -87,10 +90,11 @@ textarea{min-height:170px;resize:vertical}
   <div class="top"><span class="pill" id="mName"></span><span class="pill pts" id="mPts"></span></div>
   <h2 class="center">خريطة الرحلة</h2>
   <div class="map" id="map"></div>
+  <div class="center"><button class="btn ghost" id="mDash">📊 لوحة التقدم</button></div>
 </section>
 
 <section id="s-quiz" class="screen">
-  <div class="top"><span class="pill" id="qName"></span><span class="pill" id="qLvl"></span><span class="pill pts" id="qAvail"></span></div>
+  <div class="top"><button class="btn ghost small" data-home>🏠 الرئيسية</button><span class="pill" id="qName"></span><span class="pill" id="qLvl"></span><span class="pill pts" id="qAvail"></span></div>
   <div class="bar" style="margin:12px 0"><i id="qBar"></i></div>
   <div class="card" id="qCard">
     <div id="qNum" style="color:var(--cyan);font-weight:700"></div>
@@ -98,7 +102,13 @@ textarea{min-height:170px;resize:vertical}
     <div id="qBody"></div>
     <div class="fb" id="qFb"></div>
   </div>
-  <div class="center"><button class="btn" id="qNext" disabled>التالي</button></div>
+  <div class="center"><button class="btn ghost" id="qPrev">السابق</button> <button class="btn" id="qNext" disabled>التالي</button></div>
+</section>
+
+<section id="s-dash" class="screen">
+  <h2 class="center">📊 لوحة التقدم</h2>
+  <div id="dBody"></div>
+  <div class="center"><button class="btn" id="dBack">🏠 العودة إلى المستويات</button></div>
 </section>
 
 <section id="s-result" class="screen center">
@@ -112,7 +122,7 @@ textarea{min-height:170px;resize:vertical}
   <div style="font-size:90px">🏆</div>
   <h1 id="fTitle"></h1>
   <div class="card" id="fStats"></div>
-  <button class="btn" id="fAgain">العب مرة أخرى</button> <button class="btn ghost" id="fAch">عرض إنجازاتي</button>
+  <button class="btn" id="fAgain">العب مرة أخرى</button> <button class="btn ghost" id="fAch">عرض إنجازاتي</button> <button class="btn ghost" id="fDash">📊 لوحة التقدم</button> <button class="btn ghost" data-home>🏠 الرئيسية</button>
 </section>
 
 <div class="alarm" id="alarm"><div>🚨<br>تحذير! تم اكتشاف تهديد سيبراني، استعد للتحليل واتخاذ القرار</div></div>
@@ -169,9 +179,10 @@ const PASS=0.6;
 
 /* ===================== الحالة والتخزين ===================== */
 const KEY='cyberLeadersV1';
-let S={name:'',done:{},scores:{},right:{},stars:{}};
-try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+let S={name:'',done:{},scores:{},right:{},stars:{},ans:{}};
+try{const r=sessionStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+S.ans=S.ans||{};
+function save(){try{sessionStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 const $=id=>document.getElementById(id);
 const total=()=>Object.values(S.scores).reduce((a,b)=>a+b,0);
 const lvMax=i=>LEVELS[i].items.reduce((a,x)=>a+x.p,0);
@@ -203,7 +214,7 @@ function toWelcome(){$('wTitle').textContent='مرحبًا بك يا '+S.name+' 
 $('goMap').onclick=()=>{ac();SFX.click();toMap()};
 
 /* ===================== الخريطة ===================== */
-const unlocked=i=>i===0||!!S.done[i-1];
+const unlocked=i=>{for(let j=0;j<i;j++)if(!S.done[j])return false;return true};
 function toMap(){
   $('mName').textContent='👤 '+S.name;$('mPts').textContent='⭐ '+total()+' / '+MAXALL;
   const m=$('map');m.innerHTML='';
@@ -223,9 +234,12 @@ function toMap(){
 /* ===================== المستوى والأسئلة ===================== */
 let cur={lv:0,idx:0,answered:false};
 function startLevel(i){
-  // إعادة محاولة المستوى: تصفير نقاطه فقط (لا تتكرر النقاط)
-  LEVELS[i].items.forEach((_,j)=>{delete S.scores[i+'-'+j];delete S.right[i+'-'+j]});
-  cur={lv:i,idx:0,answered:false};save();renderItem();show('s-quiz');
+  if(!unlocked(i))return;
+  // إعادة المستوى المكتمل تبدأ من الصفر، أما المستوى غير المكتمل فيكمل الطالب من حيث توقف
+  const L=LEVELS[i],ks=L.items.map((_,j)=>i+'-'+j),n=ks.filter(k=>S.ans[k]).length;
+  if(S.done[i]||n>=L.items.length){ks.forEach(k=>{delete S.scores[k];delete S.right[k];delete S.ans[k]});cur={lv:i,idx:0,answered:false}}
+  else{ks.forEach(k=>{if(!S.ans[k]){delete S.scores[k];delete S.right[k]}});cur={lv:i,idx:n,answered:false}}
+  save();renderItem();show('s-quiz');
 }
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function renderItem(){
@@ -233,54 +247,79 @@ function renderItem(){
   $('qName').textContent='👤 '+S.name;$('qLvl').textContent='المستوى '+(cur.lv+1)+': '+L.n;$('qAvail').textContent='🎯 '+it.p+' نقاط متاحة';
   $('qBar').style.width=(cur.idx/L.items.length*100)+'%';
   $('qNum').textContent='السؤال '+(cur.idx+1)+' من '+L.items.length+(it.t==='essay'?' — سؤال مقالي':'');
-  const fb=$('qFb');fb.className='fb';fb.innerHTML='';$('qNext').disabled=true;$('qNext').textContent=cur.idx===L.items.length-1?'إنهاء المستوى':'التالي';
+  const fb=$('qFb');fb.className='fb';fb.innerHTML='';$('qNext').disabled=true;$('qNext').textContent=cur.idx===L.items.length-1?'إنهاء المستوى':'التالي';$('qPrev').style.display=cur.idx>0?'':'none';const sv=S.ans[cur.lv+'-'+cur.idx];
   const body=$('qBody');body.innerHTML='';
   if(it.t==='mcq'){
     $('qText').textContent=it.q;
     const opts=shuffle(it.o.map((x,k)=>({x,right:k===it.a})));
     // الصح/خطأ تبقى بترتيبها الطبيعي
-    const list=it.o.length===2?it.o.map((x,k)=>({x,right:k===it.a})):opts;
+    const list=sv?sv.ord.map(x=>({x,right:x===it.o[it.a]})):(it.o.length===2?it.o.map((x,k)=>({x,right:k===it.a})):opts);
     list.forEach(o=>{const b=document.createElement('button');b.className='opt';b.textContent=o.x;b.onclick=()=>answerMcq(it,o,b,list);body.appendChild(b)});
+    if(sv){cur.answered=true;paintMcq(it,list,sv.pick,false);$('qNext').disabled=false}
   }else{
     $('qText').textContent=it.q;
-    startAlarm(); // إنذار الاختراق عند فتح السؤال المقالي
-    body.innerHTML='<p style="color:var(--yellow);font-weight:700">'+esc(it.ask)+'</p><textarea id="essay" placeholder="اكتب تحليلك هنا (لا تقل عن '+it.min+' كلمة)..."></textarea><div class="center"><button class="btn" id="sendEssay">إرسال الإجابة</button></div>';
+    if(!sv)startAlarm(); // إنذار الاختراق عند فتح السؤال المقالي
+    body.innerHTML='<p style="color:var(--yellow);font-weight:700">'+esc(it.ask)+'</p><textarea id="essay" placeholder="اكتب تحليلك هنا..."></textarea><div class="center"><button class="btn" id="sendEssay">إرسال الإجابة</button></div>';
     $('essay').addEventListener('input',stopAlarm,{once:true});
     $('sendEssay').onclick=()=>gradeEssay(it);
+    if(sv){$('essay').value=sv.txt;cur.answered=true;showEssayFb(it,evalEssay(it,sv.txt),false)}
   }
 }
 function answerMcq(it,o,btn,list){
-  if(cur.answered)return;ac();cur.answered=true;const key=cur.lv+'-'+cur.idx;
-  document.querySelectorAll('#qBody .opt').forEach((b,k)=>{b.disabled=true;if(list[k].right)b.classList.add('ok')});
-  const fb=$('qFb'),card=$('qCard');
-  if(o.right){S.scores[key]=it.p;S.right[key]=1;btn.classList.add('ok');SFX.ok();card.classList.add('flash-g');stars();fb.className='fb ok';fb.innerHTML='✅ أحسنت يا '+esc(S.name)+'! +'+it.p+' نقاط<br>'+esc(it.why)}
-  else{S.scores[key]=0;btn.classList.add('bad');SFX.bad();card.classList.add('flash-r');fb.className='fb bad';fb.innerHTML='❌ لا بأس، حاول مرة أخرى في المرة القادمة!<br>الإجابة الصحيحة: <b>'+esc(it.o[it.a])+'</b><br>'+esc(it.why)}
-  setTimeout(()=>card.classList.remove('flash-g','flash-r'),700);
-  save();$('qNext').disabled=false;
+  if(cur.answered)return;ac();cur.answered=true;const key=cur.lv+'-'+cur.idx,k=list.indexOf(o);
+  S.ans[key]={ord:list.map(z=>z.x),pick:k};S.scores[key]=o.right?it.p:0;if(o.right)S.right[key]=1;
+  paintMcq(it,list,k,true);save();$('qNext').disabled=false;
+}
+function paintMcq(it,list,k,fx){
+  const bs=document.querySelectorAll('#qBody .opt');bs.forEach((b,j)=>{b.disabled=true;if(list[j].right)b.classList.add('ok')});
+  const o=list[k],btn=bs[k],fb=$('qFb'),card=$('qCard');
+  if(o.right){btn.classList.add('ok');fb.className='fb ok';fb.innerHTML='✅ أحسنت يا '+esc(S.name)+'! +'+it.p+' نقاط<br>'+esc(it.why);if(fx){SFX.ok();card.classList.add('flash-g');stars()}}
+  else{btn.classList.add('bad');fb.className='fb bad';fb.innerHTML='❌ لا بأس، حاول مرة أخرى في المرة القادمة!<br>الإجابة الصحيحة: <b>'+esc(it.o[it.a])+'</b><br>'+esc(it.why);if(fx){SFX.bad();card.classList.add('flash-r')}}
+  if(fx)setTimeout(()=>card.classList.remove('flash-g','flash-r'),700);
 }
 
 /* ===================== تقييم المقال (محلي بالمعايير) ===================== */
 function norm(s){return s.replace(/[\u064B-\u0652\u0640]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').toLowerCase()}
-function gradeEssay(it){
-  if(cur.answered)return;
-  const txt=$('essay').value.trim(),words=txt.split(/\s+/).filter(Boolean).length;
-  const fb=$('qFb');
-  if(words<it.min){fb.className='fb bad';fb.innerHTML='✍️ إجابتك قصيرة ('+words+' كلمة). اكتب على الأقل '+it.min+' كلمة لتغطي عناصر المطلوب.';return}
-  stopAlarm();cur.answered=true;const key=cur.lv+'-'+cur.idx,n=norm(txt);
-  const met=[],miss=[];
-  it.crit.forEach(([label,pats])=>{
-    // يُحتسب المعيار إذا ذُكر أي من مفاهيمه (مع مرادفاته) داخل الإجابة
-    const hit=pats.some(p=>new RegExp(norm(p)).test(n));(hit?met:miss).push(label)});
-  const pts=Math.round(it.p*met.length/it.crit.length);
-  S.scores[key]=pts;if(met.length>=Math.ceil(it.crit.length/2))S.right[key]=1;save();
-  const good=met.length>=Math.ceil(it.crit.length/2);
-  (good?SFX.ok:SFX.bad)();if(good)stars();
-  $('sendEssay').disabled=true;$('essay').disabled=true;
-  fb.className='fb '+(good?'ok':'bad');
-  fb.innerHTML='<b>تقييم محلي بحسب معايير الإجابة (دون اتصال بخدمة خارجية): '+pts+' / '+it.p+'</b><ul class="fb-list">'+met.map(x=>'<li>✅ '+esc(x)+'</li>').join('')+miss.map(x=>'<li>⚠️ ناقص: '+esc(x)+'</li>').join('')+'</ul><b>نموذج الإجابة:</b> '+esc(it.ok);
+function evalEssay(it,txt){
+  const n=norm(txt),met=[],miss=[];
+  it.crit.forEach(([label,pats])=>{const hit=pats.some(p=>new RegExp(norm(p)).test(n));(hit?met:miss).push(label)});
+  return{met,miss,pts:Math.round(it.p*met.length/it.crit.length),good:met.length>=Math.ceil(it.crit.length/2)};
+}
+function showEssayFb(it,r,fx){
+  if(fx){(r.good?SFX.ok:SFX.bad)();if(r.good)stars()}
+  $('sendEssay').disabled=true;$('essay').disabled=true;const fb=$('qFb');fb.className='fb '+(r.good?'ok':'bad');
+  fb.innerHTML='<b>تقييم محلي بحسب معايير الإجابة (دون اتصال بخدمة خارجية): '+r.pts+' / '+it.p+'</b><ul class="fb-list">'+r.met.map(x=>'<li>✅ '+esc(x)+'</li>').join('')+r.miss.map(x=>'<li>⚠️ ناقص: '+esc(x)+'</li>').join('')+'</ul><b>نموذج الإجابة:</b> '+esc(it.ok);
   $('qNext').disabled=false;
 }
+function gradeEssay(it){
+  if(cur.answered)return;
+  const txt=$('essay').value.trim(),fb=$('qFb');
+  if(!txt){fb.className='fb bad';fb.innerHTML='✍️ اكتب إجابتك أولًا.';return}
+  stopAlarm();cur.answered=true;const key=cur.lv+'-'+cur.idx,r=evalEssay(it,txt);
+  S.scores[key]=r.pts;if(r.good)S.right[key]=1;S.ans[key]={txt};save();showEssayFb(it,r,true);
+}
 $('qNext').onclick=()=>{ac();SFX.click();const L=LEVELS[cur.lv];if(cur.idx<L.items.length-1){cur.idx++;renderItem()}else finishLevel()};
+
+$('qPrev').onclick=()=>{ac();SFX.click();stopAlarm();if(cur.idx>0){cur.idx--;renderItem()}};
+document.querySelectorAll('[data-home]').forEach(b=>b.onclick=()=>{ac();SFX.click();stopAlarm();toMap()});
+
+/* ===================== لوحة التقدم ===================== */
+function toDash(){
+  stopAlarm();const p=total(),t=titleFor(p),nx=[...TITLES].reverse().find(x=>p<x[0]);
+  const nAll=LEVELS.reduce((a,L)=>a+L.items.length,0),nAns=LEVELS.reduce((a,L,i)=>a+L.items.filter((_,j)=>S.ans[i+'-'+j]).length,0);
+  const right=Object.keys(S.right).length,st=Object.values(S.stars).reduce((a,b)=>a+b,0),dn=Object.keys(S.done).length;
+  let h='<div class="card center"><div class="top"><span class="pill">👤 '+esc(S.name)+'</span><span class="pill pts">⭐ '+p+' / '+MAXALL+'</span></div><div class="bar" style="margin:14px 0"><i style="width:'+(nAns/nAll*100)+'%"></i></div><p>أنجزت '+nAns+' من '+nAll+' سؤالًا</p>'+(t?'<h3>'+t[2]+' — '+esc(t[1])+'</h3>':'<p>لا لقب بعد</p>')+(nx?'<p style="opacity:.8">باقي '+(nx[0]-p)+' نقطة للوصول إلى «'+esc(nx[1])+'»</p>':'')+'</div>';
+  h+='<div class="grid3"><div class="card"><b>'+dn+'/'+LEVELS.length+'</b><span>مستويات مكتملة</span></div><div class="card"><b>'+right+'</b><span>إجابات صحيحة</span></div><div class="card"><b class="pts">'+st+' ⭐</b><span>النجوم</span></div></div>';
+  LEVELS.forEach((L,i)=>{
+    const open=unlocked(i),done=!!S.done[i],ans=L.items.filter((_,j)=>S.ans[i+'-'+j]).length,sc=lvScore(i),mx=lvMax(i);
+    const dots=L.items.map((it,j)=>{const k=i+'-'+j,c=!S.ans[k]?'#4a5d7a':S.scores[k]>=it.p?'var(--green)':S.scores[k]>0?'var(--yellow)':'var(--red)';return '<i class="dot" style="background:'+c+'"></i>'}).join('');
+    h+='<div class="card"><div class="top"><b>'+(i+1)+'. '+esc(L.n)+'</b><span class="pill">'+(done?'✅ مكتمل':ans?'⏳ قيد التقدم':open?'🔓 جاهز':'🔒 مقفل')+'</span></div><div class="bar" style="margin:10px 0"><i style="width:'+(sc/mx*100)+'%"></i></div><div class="top"><span class="pts">⭐ '+sc+' / '+mx+'</span><span>'+(done?'<span class="stars">'+'★'.repeat(S.stars[i]||1)+'</span> ':'')+dots+'</span></div></div>';
+  });
+  h+='<p class="center" style="opacity:.8">🟢 كاملة &nbsp;🟡 جزئية &nbsp;🔴 خاطئة &nbsp;⚪ لم تُحل</p>';
+  $('dBody').innerHTML=h;show('s-dash');
+}
+$('dBack').onclick=()=>{ac();SFX.click();toMap()};$('mDash').onclick=()=>{ac();SFX.click();toDash()};$('fDash').onclick=toDash;
+$('dashBtn').onclick=()=>{ac();if(S.name)toDash()};
 
 /* ===================== نهاية المستوى ===================== */
 function finishLevel(){
@@ -321,7 +360,7 @@ function achievements(){
   $('modal').classList.add('on');
 }
 $('achBtn').onclick=()=>{ac();achievements()};$('fAch').onclick=achievements;$('closeM').onclick=()=>$('modal').classList.remove('on');
-function resetAll(){if(confirm('هل أنت متأكد؟ سيتم حذف اسمك وكل تقدمك نهائيًا.')){S={name:'',done:{},scores:{},right:{},stars:{}};try{localStorage.removeItem(KEY)}catch(e){}$('nameIn').value='';show('s-login')}}
+function resetAll(){if(confirm('هل أنت متأكد؟ سيتم حذف اسمك وكل تقدمك نهائيًا.')){S={name:'',done:{},scores:{},right:{},stars:{},ans:{}};try{sessionStorage.removeItem(KEY)}catch(e){}$('nameIn').value='';show('s-login')}}
 $('resetBtn').onclick=resetAll;$('fAgain').onclick=resetAll;
 $('muteBtn').onclick=()=>{ac();muted=!muted;$('muteBtn').textContent=muted?'🔇':'🔊';if(muted)stopAlarm()};
 document.addEventListener('click',()=>ac(),{once:true});
