@@ -180,9 +180,9 @@ const PASS=0.6;
 /* ===================== الحالة والتخزين ===================== */
 const KEY='cyberLeadersV1';
 let S={name:'',done:{},scores:{},right:{},stars:{},ans:{}};
-try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+try{const r=sessionStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 S.ans=S.ans||{};
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){try{sessionStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 const $=id=>document.getElementById(id);
 const total=()=>Object.values(S.scores).reduce((a,b)=>a+b,0);
 const lvMax=i=>LEVELS[i].items.reduce((a,x)=>a+x.p,0);
@@ -214,7 +214,7 @@ function toWelcome(){$('wTitle').textContent='مرحبًا بك يا '+S.name+' 
 $('goMap').onclick=()=>{ac();SFX.click();toMap()};
 
 /* ===================== الخريطة ===================== */
-const unlocked=i=>i===0||!!S.done[i-1];
+const unlocked=i=>{for(let j=0;j<i;j++)if(!S.done[j])return false;return true};
 function toMap(){
   $('mName').textContent='👤 '+S.name;$('mPts').textContent='⭐ '+total()+' / '+MAXALL;
   const m=$('map');m.innerHTML='';
@@ -234,6 +234,7 @@ function toMap(){
 /* ===================== المستوى والأسئلة ===================== */
 let cur={lv:0,idx:0,answered:false};
 function startLevel(i){
+  if(!unlocked(i))return;
   // إعادة المستوى المكتمل تبدأ من الصفر، أما المستوى غير المكتمل فيكمل الطالب من حيث توقف
   const L=LEVELS[i],ks=L.items.map((_,j)=>i+'-'+j),n=ks.filter(k=>S.ans[k]).length;
   if(S.done[i]||n>=L.items.length){ks.forEach(k=>{delete S.scores[k];delete S.right[k];delete S.ans[k]});cur={lv:i,idx:0,answered:false}}
@@ -359,7 +360,7 @@ function achievements(){
   $('modal').classList.add('on');
 }
 $('achBtn').onclick=()=>{ac();achievements()};$('fAch').onclick=achievements;$('closeM').onclick=()=>$('modal').classList.remove('on');
-function resetAll(){if(confirm('هل أنت متأكد؟ سيتم حذف اسمك وكل تقدمك نهائيًا.')){S={name:'',done:{},scores:{},right:{},stars:{},ans:{}};try{localStorage.removeItem(KEY)}catch(e){}$('nameIn').value='';show('s-login')}}
+function resetAll(){if(confirm('هل أنت متأكد؟ سيتم حذف اسمك وكل تقدمك نهائيًا.')){S={name:'',done:{},scores:{},right:{},stars:{},ans:{}};try{sessionStorage.removeItem(KEY)}catch(e){}$('nameIn').value='';show('s-login')}}
 $('resetBtn').onclick=resetAll;$('fAgain').onclick=resetAll;
 $('muteBtn').onclick=()=>{ac();muted=!muted;$('muteBtn').textContent=muted?'🔇':'🔊';if(muted)stopAlarm()};
 document.addEventListener('click',()=>ac(),{once:true});
